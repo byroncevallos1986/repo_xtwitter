@@ -1,0 +1,4 @@
+tweepy
+pandas
+google-cloud-bigquery
+pyarrow
