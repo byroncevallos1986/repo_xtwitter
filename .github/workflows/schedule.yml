@@ -32,4 +32,4 @@ jobs:
           GOOGLE_APPLICATION_CREDENTIALS_JSON: ${{ secrets.GOOGLE_APPLICATION_CREDENTIALS_JSON }}
           XTOKEN: ${{ secrets.XTOKEN }}
         run: |
-          python tu_script.py
+          python main.py
