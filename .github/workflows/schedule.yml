@@ -2,7 +2,7 @@ name: 🚀 Twitter → BigQuery
 
 on:
   schedule:
-    - cron: "0 */2 * * *"   # ⏰ Ejecuta cada 2 hora
+    - cron: "0 */3 * * *"   # ⏰ Ejecuta cada 3 hora
   workflow_dispatch:       # ▶️ Permite ejecutarlo manualmente desde GitHub
 
 jobs:
