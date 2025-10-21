@@ -143,7 +143,7 @@ def buscar_tweets(client_twitter):
         end_time = datetime.now(timezone.utc) - timedelta(seconds=15)
         start_time = end_time - timedelta(hours=24)  # Últimas 24 horas
 
-        query = "(@BancoPichincha (@superbancosEC OR @DEFENSORIAEC)) -is:retweet"
+        query = "@BancoPichincha @superbancosEC -is:retweet"
 
         tweets = client_twitter.search_recent_tweets(
             query=query,
