@@ -1,4 +1,17 @@
-tweepy
-pandas
-google-cloud-bigquery
-pyarrow
+# Librerías principales
+tweepy==4.14.0
+pandas==2.2.2
+
+# Google BigQuery
+google-cloud-bigquery==3.20.1
+google-cloud-core==2.4.1
+pyarrow==16.1.0
+
+# Manejo de logs (formato JSON)
+python-json-logger==2.0.7
+
+# Compatibilidad con zonas horarias
+pytz==2024.1
+
+# Seguridad y manejo de archivos .env
+python-dotenv==1.0.1
