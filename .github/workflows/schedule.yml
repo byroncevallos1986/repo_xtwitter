@@ -30,8 +30,12 @@ jobs:
       # 🔑 4️⃣ Configurar credenciales de Google Cloud (BigQuery)
       # ⚠️ Debes agregar tu JSON de servicio como un secreto llamado GOOGLE_APPLICATION_CREDENTIALS_JSON
       - name: Crear archivo de credenciales
+        env:
+          # Carga el secreto en una variable de entorno limpia para este paso
+          GCP_JSON_KEY: ${{ secrets.GOOGLE_APPLICATION_CREDENTIALS_JSON }}
         run: |
-          echo "${{ secrets.GOOGLE_APPLICATION_CREDENTIALS_JSON }}" > service_account.json
+          # Escribe el contenido de la variable de entorno al archivo
+          echo "$GCP_JSON_KEY" > service_account.json
         shell: bash
 
       # 📁 5️⃣ Crear archivo temporal para logs
