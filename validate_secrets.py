@@ -47,8 +47,10 @@ def validate_secrets():
     else:
         print("❌ GOOGLE_APPLICATION_CREDENTIALS_JSON: No se pudo leer o está vacío.")
     
-    # Resumen
-    if all(results.values()[:-1]):  # Ignora 'status'
+    # Resumen (CORREGIDO: Verificación explícita en lugar de slicing)
+    if (results['BEARER_TOKEN_1'] and 
+        results['BEARER_TOKEN_2'] and 
+        results['GOOGLE_APPLICATION_CREDENTIALS_JSON']):
         results['status'] = 'SUCCESS'
         print("\n🎉 ¡Todos los secrets se leyeron exitosamente!")
     else:
