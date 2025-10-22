@@ -2,8 +2,8 @@ name: Ejecutar Twitter BigQuery Diario
 
 on:
   schedule:
-    # Ejecutar todos los días a las 00:00:00 UTC
-    - cron: "0 0 * * *"
+    # Ejecutar todos los días a las 00:00 hora de Ecuador (05:00 UTC)
+    - cron: "0 5 * * *"
   workflow_dispatch:  # Permite ejecución manual desde la pestaña "Actions"
 
 jobs:
@@ -28,6 +28,7 @@ jobs:
           pip install -r requirements.txt
 
       # 🔑 4️⃣ Configurar credenciales de Google Cloud (BigQuery)
+      # ⚠️ Agrega tu JSON de servicio como secreto llamado GOOGLE_APPLICATION_CREDENTIALS_JSON
       - name: Crear archivo de credenciales
         env:
           GCP_JSON_KEY: ${{ secrets.GOOGLE_APPLICATION_CREDENTIALS_JSON }}
@@ -42,11 +43,21 @@ jobs:
       # 🚀 6️⃣ Ejecutar script principal
       - name: Ejecutar main.py
         env:
+          # 🔐 Variables de entorno y rutas
+          XLOG_PATH: xlog.log
+          XTOKEN1_PATH: xtoken1.env
+          XTOKEN2_PATH: xtoken2.env
+          GOOGLE_APPLICATION_CREDENTIALS_PATH: service_account.json
+          BQ_TABLE_ID: xpry-472917.xds.xtable
+          GCP_PROJECT: xpry-472917
+          GITHUB_ACTIONS: true
+
+          # 🔑 Tokens y credenciales seguras
           GOOGLE_APPLICATION_CREDENTIALS: ${{ github.workspace }}/service_account.json
           BEARER_TOKEN_1: ${{ secrets.BEARER_TOKEN_1 }}
           BEARER_TOKEN_2: ${{ secrets.BEARER_TOKEN_2 }}
         run: |
-          python main.py >> xlog.log 2>&1
+          python main.py
 
       # 📤 7️⃣ Subir archivo de logs como artifact
       - name: Subir log como artifact
