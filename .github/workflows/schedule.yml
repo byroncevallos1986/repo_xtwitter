@@ -28,13 +28,10 @@ jobs:
           pip install -r requirements.txt
 
       # 🔑 4️⃣ Configurar credenciales de Google Cloud (BigQuery)
-      # ⚠️ Debes agregar tu JSON de servicio como un secreto llamado GOOGLE_APPLICATION_CREDENTIALS_JSON
       - name: Crear archivo de credenciales
         env:
-          # Carga el secreto en una variable de entorno limpia para este paso
           GCP_JSON_KEY: ${{ secrets.GOOGLE_APPLICATION_CREDENTIALS_JSON }}
         run: |
-          # Escribe el contenido de la variable de entorno al archivo
           echo "$GCP_JSON_KEY" > service_account.json
         shell: bash
 
@@ -49,7 +46,7 @@ jobs:
           BEARER_TOKEN_1: ${{ secrets.BEARER_TOKEN_1 }}
           BEARER_TOKEN_2: ${{ secrets.BEARER_TOKEN_2 }}
         run: |
-          python main.py
+          python main.py >> xlog.log 2>&1
 
       # 📤 7️⃣ Subir archivo de logs como artifact
       - name: Subir log como artifact
