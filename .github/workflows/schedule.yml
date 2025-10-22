@@ -40,7 +40,17 @@ jobs:
       - name: Crear archivo de log vacío
         run: echo "Inicio de ejecución del workflow" > xlog.log
 
-      # 🚀 6️⃣ Ejecutar script principal
+      # 🧩 6️⃣ Crear archivos de tokens a partir de los secretos
+      - name: Crear archivos de tokens
+        env:
+          BEARER_TOKEN_1: ${{ secrets.BEARER_TOKEN_1 }}
+          BEARER_TOKEN_2: ${{ secrets.BEARER_TOKEN_2 }}
+        run: |
+          echo "BEARER_TOKEN=${BEARER_TOKEN_1}" > xtoken1.env
+          echo "BEARER_TOKEN=${BEARER_TOKEN_2}" > xtoken2.env
+        shell: bash
+
+      # 🚀 7️⃣ Ejecutar script principal
       - name: Ejecutar main.py
         env:
           # 🔐 Variables de entorno y rutas
@@ -52,14 +62,12 @@ jobs:
           GCP_PROJECT: xpry-472917
           GITHUB_ACTIONS: true
 
-          # 🔑 Tokens y credenciales seguras
+          # 🔑 Credenciales
           GOOGLE_APPLICATION_CREDENTIALS: ${{ github.workspace }}/service_account.json
-          BEARER_TOKEN_1: ${{ secrets.BEARER_TOKEN_1 }}
-          BEARER_TOKEN_2: ${{ secrets.BEARER_TOKEN_2 }}
         run: |
           python main.py
 
-      # 📤 7️⃣ Subir archivo de logs como artifact
+      # 📤 8️⃣ Subir archivo de logs como artifact
       - name: Subir log como artifact
         uses: actions/upload-artifact@v4
         with:
