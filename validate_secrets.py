@@ -1,4 +1,6 @@
-# validate_secrets.py
+# =========================================
+# 🚀 validate_secrets.py
+# =========================================
 import os
 import json
 import sys
@@ -51,6 +53,7 @@ def validate_secrets():
 
     return results
 
+
 def test_bigquery(table_fqn: str) -> bool:
     """
     Prueba de conexión a BigQuery ejecutando SELECT COUNT(*) sobre la tabla dada.
@@ -59,7 +62,11 @@ def test_bigquery(table_fqn: str) -> bool:
     try:
         from google.cloud import bigquery
         from google.api_core.exceptions import NotFound, Forbidden
+    except ModuleNotFoundError:
+        print("❌ No se encontró el módulo 'google-cloud-bigquery'. Verifica que esté instalado en el entorno.")
+        return False
 
+    try:
         # Instanciar cliente (usa GOOGLE_APPLICATION_CREDENTIALS si está seteado)
         client = bigquery.Client()
 
@@ -85,11 +92,11 @@ def test_bigquery(table_fqn: str) -> bool:
         print(f"❌ BigQuery: Error inesperado al consultar `{table_fqn}`. Detalle: {e}")
         return False
 
+
 if __name__ == "__main__":
     results = validate_secrets()
 
     # Si el JSON de credenciales de servicio es válido, intentamos la prueba de BigQuery.
-    # Nota: el workflow escribirá el JSON a un archivo y seteará GOOGLE_APPLICATION_CREDENTIALS.
     TABLE_FQN = os.getenv("BQ_TABLE_FQN", "xpry-472917.xds.xtable")
     if results.get('GOOGLE_APPLICATION_CREDENTIALS_JSON'):
         bq_ok = test_bigquery(TABLE_FQN)
