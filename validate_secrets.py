@@ -1,116 +1,119 @@
 # =========================================
 # 🚀 validate_secrets.py
 # =========================================
+
 import os
-import json
-import sys
+import tweepy
+import pandas as pd
+from datetime import datetime, timedelta, timezone
+from google.cloud import bigquery
 
-def validate_secrets():
-    """
-    Valida la lectura de Repository Secrets en GitHub.
-    - BEARER_TOKEN_1: Debe ser un string no vacío.
-    - BEARER_TOKEN_2: Debe ser un string no vacío.
-    - GOOGLE_APPLICATION_CREDENTIALS_JSON: Debe ser un JSON de service_account válido (no vacío).
-    """
-    results = {
-        'BEARER_TOKEN_1': False,
-        'BEARER_TOKEN_2': False,
-        'GOOGLE_APPLICATION_CREDENTIALS_JSON': False,
-        'BIGQUERY_TEST': False,
-        'status': 'FAILED'
-    }
+def get_twitter_client():
+    """Obtiene el cliente de la API de XTwitter usando BEARER_TOKEN_1 o BEARER_TOKEN_2."""
+    token1 = os.getenv("BEARER_TOKEN_1")
+    token2 = os.getenv("BEARER_TOKEN_2")
 
-    # Verificar BEARER_TOKEN_1
-    token1 = os.getenv('BEARER_TOKEN_1')
-    if token1 and len(token1.strip()) > 0:
-        results['BEARER_TOKEN_1'] = True
-        print(f"✅ BEARER_TOKEN_1: Cargado exitosamente (longitud: {len(token1)} caracteres)")
-    else:
-        print("❌ BEARER_TOKEN_1: No se pudo leer o está vacío.")
-
-    # Verificar BEARER_TOKEN_2
-    token2 = os.getenv('BEARER_TOKEN_2')
-    if token2 and len(token2.strip()) > 0:
-        results['BEARER_TOKEN_2'] = True
-        print(f"✅ BEARER_TOKEN_2: Cargado exitosamente (longitud: {len(token2)} caracteres)")
-    else:
-        print("❌ BEARER_TOKEN_2: No se pudo leer o está vacío.")
-
-    # Verificar GOOGLE_APPLICATION_CREDENTIALS_JSON
-    json_str = os.getenv('GOOGLE_APPLICATION_CREDENTIALS_JSON')
-    if json_str and len(json_str.strip()) > 0:
-        try:
-            json_data = json.loads(json_str)
-            if isinstance(json_data, dict) and json_data.get('type') == 'service_account':
-                results['GOOGLE_APPLICATION_CREDENTIALS_JSON'] = True
-                print("✅ GOOGLE_APPLICATION_CREDENTIALS_JSON: Cargado y válido (service_account detectado)")
-            else:
-                print("❌ GOOGLE_APPLICATION_CREDENTIALS_JSON: JSON cargado pero estructura inválida (no es service_account).")
-        except json.JSONDecodeError as e:
-            print(f"❌ GOOGLE_APPLICATION_CREDENTIALS_JSON: JSON inválido. Error: {e}")
-    else:
-        print("❌ GOOGLE_APPLICATION_CREDENTIALS_JSON: No se pudo leer o está vacío.")
-
-    return results
+    for token in [token1, token2]:
+        if token:
+            try:
+                client = tweepy.Client(bearer_token=token, wait_on_rate_limit=True)
+                # Probar una consulta simple
+                client.get_user(username="BancoPichincha")
+                print(f"✅ Conexión exitosa a la API de Twitter con token ({len(token)} caracteres)")
+                return client
+            except Exception as e:
+                print(f"⚠️ Error con el token (len={len(token)}): {e}")
+    raise RuntimeError("❌ No se pudo autenticar con ninguno de los BEARER_TOKEN disponibles.")
 
 
-def test_bigquery(table_fqn: str) -> bool:
-    """
-    Prueba de conexión a BigQuery ejecutando SELECT COUNT(*) sobre la tabla dada.
-    Requiere que GOOGLE_APPLICATION_CREDENTIALS apunte a un archivo de credenciales válido.
-    """
-    try:
-        from google.cloud import bigquery
-        from google.api_core.exceptions import NotFound, Forbidden
-    except ModuleNotFoundError:
-        print("❌ No se encontró el módulo 'google-cloud-bigquery'. Verifica que esté instalado en el entorno.")
-        return False
+def fetch_tweets(client):
+    """Obtiene tweets de las últimas 24 horas que mencionen a @BancoPichincha."""
+    end_time = datetime.now(timezone.utc)
+    start_time = end_time - timedelta(hours=24)
+    query = "@BancoPichincha -is:retweet"
 
-    try:
-        # Instanciar cliente (usa GOOGLE_APPLICATION_CREDENTIALS si está seteado)
-        client = bigquery.Client()
+    print(f"🔎 Buscando tweets desde {start_time.isoformat()} hasta {end_time.isoformat()}...")
 
-        query = f"SELECT COUNT(*) AS total FROM `{table_fqn}`"
-        print(f"🔎 Ejecutando consulta de prueba a BigQuery: {query}")
-        job = client.query(query)
-        result = list(job.result())  # materializa resultados
-        if result:
-            total = result[0].get("total")
-            print(f"✅ BigQuery OK: La tabla `{table_fqn}` respondió COUNT(*) = {total}")
-            return True
-        else:
-            print("⚠️ BigQuery respondió sin filas para la consulta de prueba.")
-            return False
+    tweets = []
+    for tweet in tweepy.Paginator(
+        client.search_recent_tweets,
+        query=query,
+        tweet_fields=["created_at", "public_metrics", "author_id", "text"],
+        user_fields=["username"],
+        expansions=["author_id"],
+        max_results=100
+    ).flatten(limit=200):
+        tweets.append(tweet)
 
-    except NotFound:
-        print(f"❌ BigQuery: La tabla `{table_fqn}` no existe o el dataset/proyecto es incorrecto.")
-        return False
-    except Forbidden as e:
-        print(f"❌ BigQuery: Permisos insuficientes para acceder a `{table_fqn}`. Detalle: {e}")
-        return False
-    except Exception as e:
-        print(f"❌ BigQuery: Error inesperado al consultar `{table_fqn}`. Detalle: {e}")
-        return False
+    print(f"✅ Se obtuvieron {len(tweets)} tweets recientes.")
+    return tweets
+
+
+def build_dataframe(tweets, client):
+    """Transforma los tweets en un DataFrame compatible con BigQuery."""
+    data = []
+    users = {}
+
+    # Obtener los usuarios en bloque (para reducir llamadas)
+    author_ids = list({t.author_id for t in tweets if t.author_id})
+    user_data = client.get_users(ids=author_ids, user_fields=["username"]).data or []
+    for u in user_data:
+        users[u.id] = u.username
+
+    for t in tweets:
+        metrics = t.public_metrics
+        data.append({
+            "Id": str(t.id),
+            "Text": t.text,
+            "Autor": users.get(t.author_id, "desconocido"),
+            "Retweet": metrics.get("retweet_count", 0),
+            "Reply": metrics.get("reply_count", 0),
+            "Likes": metrics.get("like_count", 0),
+            "Quote": metrics.get("quote_count", 0),
+            "Bookmark": metrics.get("bookmark_count", 0),
+            "Impression": metrics.get("impression_count", 0),
+            "Created": t.created_at.astimezone(timezone(timedelta(hours=-5)))  # hora Ecuador
+        })
+
+    df = pd.DataFrame(data)
+    print(f"📊 DataFrame creado con {len(df)} registros.")
+    return df
+
+
+def load_to_bigquery(df, table_fqn):
+    """Carga los tweets en la tabla BigQuery."""
+    client = bigquery.Client()
+
+    job_config = bigquery.LoadJobConfig(
+        write_disposition="WRITE_APPEND",
+        schema=[
+            bigquery.SchemaField("Id", "STRING"),
+            bigquery.SchemaField("Text", "STRING"),
+            bigquery.SchemaField("Autor", "STRING"),
+            bigquery.SchemaField("Retweet", "INTEGER"),
+            bigquery.SchemaField("Reply", "INTEGER"),
+            bigquery.SchemaField("Likes", "INTEGER"),
+            bigquery.SchemaField("Quote", "INTEGER"),
+            bigquery.SchemaField("Bookmark", "INTEGER"),
+            bigquery.SchemaField("Impression", "INTEGER"),
+            bigquery.SchemaField("Created", "DATETIME"),
+        ],
+    )
+
+    print(f"🚀 Cargando datos en BigQuery: {table_fqn} ...")
+    job = client.load_table_from_dataframe(df, table_fqn, job_config=job_config)
+    job.result()  # Esperar a que finalice
+    print(f"✅ {len(df)} registros insertados en {table_fqn} exitosamente.")
 
 
 if __name__ == "__main__":
-    results = validate_secrets()
-
-    # Si el JSON de credenciales de servicio es válido, intentamos la prueba de BigQuery.
     TABLE_FQN = os.getenv("BQ_TABLE_FQN", "xpry-472917.xds.xtable")
-    if results.get('GOOGLE_APPLICATION_CREDENTIALS_JSON'):
-        bq_ok = test_bigquery(TABLE_FQN)
-        results['BIGQUERY_TEST'] = bq_ok
-    else:
-        print("⏭️ Omitiendo prueba de BigQuery: credenciales de servicio no válidas.")
 
-    if (results['BEARER_TOKEN_1']
-        and results['BEARER_TOKEN_2']
-        and results['GOOGLE_APPLICATION_CREDENTIALS_JSON']
-        and results['BIGQUERY_TEST']):
-        results['status'] = 'SUCCESS'
-        print("\n🎉 ¡Todos los checks pasaron (secrets y BigQuery)!")
-        sys.exit(0)
+    twitter_client = get_twitter_client()
+    tweets = fetch_tweets(twitter_client)
+
+    if tweets:
+        df = build_dataframe(tweets, twitter_client)
+        load_to_bigquery(df, TABLE_FQN)
     else:
-        print("\n⚠️ Algunos checks fallaron. Revisa los logs arriba y la configuración de Secrets/Permisos.")
-        sys.exit(1)
+        print("⚠️ No se encontraron tweets en las últimas 24 horas.")
