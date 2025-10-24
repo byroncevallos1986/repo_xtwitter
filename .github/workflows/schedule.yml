@@ -1,4 +1,4 @@
-name: 🚀 Ejecutar main.py y subir logs
+name: schedule
 
 on:
   schedule:
