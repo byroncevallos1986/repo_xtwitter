@@ -31,7 +31,7 @@ jobs:
           GOOGLE_APPLICATION_CREDENTIALS_JSON: ${{ secrets.GOOGLE_APPLICATION_CREDENTIALS_JSON }}
 
       - name: Validar Secrets y BigQuery
-        run: python validate_secrets.py
+        run: python main.py
         env:
           BEARER_TOKEN_1: ${{ secrets.BEARER_TOKEN_1 }}
           BEARER_TOKEN_2: ${{ secrets.BEARER_TOKEN_2 }}
