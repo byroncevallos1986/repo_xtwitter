@@ -49,11 +49,15 @@ jobs:
           GOOGLE_APPLICATION_CREDENTIALS: ${{ runner.temp }}/gcp-key.json
           BQ_TABLE_FQN: xpry-472917.xds.xtable
 
-      - name: 📤 Guardar logs del workflow como artifact
+      # ✅ Este bloque ahora son DOS pasos separados correctamente:
+      - name: 🧾 Copiar logs generados (si existen)
         if: always()
         run: |
           mkdir -p logs
           cp -v *.log logs/ 2>/dev/null || echo "No se encontraron archivos .log"
+
+      - name: 📤 Subir logs como artifact
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: workflow-logs
